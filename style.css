@@ -1,71 +1,70 @@
-/* ==========================================================================
-   NecroDL fixes + media preview
-   ========================================================================== */
+/* NecroDL media + theme fixes */
 
-/* Remove the old top-left tagline and make the theme switch geometrically
-   symmetric. The thumb is centered in a fixed track instead of relying on
-   transform math that becomes asymmetric when pressed. */
 .brand-tagline{display:none!important}
+
 .theme-toggle{
-  --w:64px;
-  --h:34px;
+  --track-w:64px;
+  --track-h:34px;
+  --thumb:28px;
   position:relative;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  align-items:center;
-  justify-items:center;
-  width:var(--w);
-  height:var(--h);
-  padding:3px;
+  display:block;
+  width:var(--track-w);
+  height:var(--track-h);
+  min-width:var(--track-w);
+  padding:0;
+  margin:0;
   border-radius:999px;
-  overflow:visible;
+  overflow:hidden;
+  box-sizing:border-box;
 }
 .theme-side{
+  position:absolute;
+  top:3px;
   width:28px;
   height:28px;
   display:grid;
   place-items:center;
-  position:relative;
   z-index:2;
   color:var(--text-faint);
-  transition:color 220ms ease,transform 260ms cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;
+  transition:color 220ms ease,opacity 220ms ease;
 }
+.theme-side-sun{left:3px}
+.theme-side-moon{right:3px}
 .theme-side svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.theme-side-sun{grid-column:1}
-.theme-side-moon{grid-column:2}
 .theme-thumb{
   position:absolute;
-  z-index:1;
+  z-index:3;
   top:3px;
   left:3px;
-  width:28px;
-  height:28px;
+  width:var(--thumb);
+  height:var(--thumb);
   margin:0;
   border-radius:50%;
   background:linear-gradient(135deg,var(--blue),var(--purple));
-  box-shadow:0 0 12px rgba(96,165,250,.55),inset 0 1px 1px rgba(255,255,255,.28);
+  box-shadow:0 0 12px rgba(96,165,250,.45),inset 0 1px 1px rgba(255,255,255,.28);
   transform:translateX(0);
-  transition:transform 320ms cubic-bezier(.34,1.56,.64,1);
+  transition:transform 300ms cubic-bezier(.34,1.35,.64,1),filter 180ms ease;
 }
-.theme-toggle[aria-pressed="true"] .theme-thumb{transform:translateX(30px)}
-.theme-toggle[aria-pressed="false"] .theme-side-sun{color:#fff;transform:scale(1.04)}
-.theme-toggle[aria-pressed="true"] .theme-side-moon{color:#fff;transform:scale(1.04)}
-.theme-toggle:active .theme-thumb{filter:brightness(1.12);transform:translateX(0) scale(.94)}
-.theme-toggle[aria-pressed="true"]:active .theme-thumb{transform:translateX(30px) scale(.94)}
+.theme-toggle[aria-pressed="true"] .theme-thumb{transform:translateX(calc(var(--track-w) - var(--thumb) - 6px))}
+.theme-toggle[aria-pressed="false"] .theme-side-sun{color:#fff;opacity:1}
+.theme-toggle[aria-pressed="false"] .theme-side-moon{opacity:.6}
+.theme-toggle[aria-pressed="true"] .theme-side-sun{opacity:.6}
+.theme-toggle[aria-pressed="true"] .theme-side-moon{color:#fff;opacity:1}
+.theme-toggle:active .theme-thumb{filter:brightness(1.12) scale(.92)}
 
-/* Result card */
 .media-result-section{width:100%}
 .media-card{display:flex;flex-direction:column;gap:16px;animation:media-in 420ms var(--ease-out) both}
-.media-heading{display:flex;flex-direction:column;gap:5px}
+.media-heading{display:flex;flex-direction:column;gap:6px}
 .media-heading h2{margin:0;font-family:var(--font-display);font-size:1.05rem;line-height:1.35;overflow-wrap:anywhere}
 .media-type{display:inline-flex;align-self:flex-start;padding:5px 10px;border-radius:999px;background:rgba(59,130,246,.13);border:1px solid rgba(96,165,250,.25);color:var(--blue-soft);font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .media-preview{width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:rgba(0,0,0,.18);border:1px solid var(--glass-border);display:grid;place-items:center}
-.media-preview img{width:100%;height:100%;object-fit:cover}
+.media-preview img{display:block;width:100%;height:100%;object-fit:cover}
 .media-preview-empty{color:var(--text-faint);padding:24px;text-align:center;aspect-ratio:auto;min-height:160px}
 .photo-carousel{display:flex;flex-direction:column;gap:12px}
 .carousel-viewport{position:relative;width:100%;aspect-ratio:4/5;max-height:68vh;border-radius:20px;overflow:hidden;background:rgba(0,0,0,.22);border:1px solid var(--glass-border);display:grid;place-items:center}
-.carousel-image{width:100%;height:100%;object-fit:contain;background:rgba(0,0,0,.12);transition:opacity 180ms ease}
-.carousel-controls{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:10px}
+.carousel-image{display:block;width:100%;height:100%;object-fit:contain;background:rgba(0,0,0,.12);transition:opacity 180ms ease}
+.carousel-controls{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:10px}
 .carousel-btn{position:relative;overflow:hidden;width:44px;height:44px;border-radius:50%;border:1px solid var(--glass-border);background:var(--ghost-bg);color:var(--text-primary);font-size:30px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform 180ms var(--ease-spring),background 180ms ease}
 .carousel-btn:active{transform:scale(.9)}
 .carousel-counter{text-align:center;color:var(--text-muted);font-size:.84rem;font-weight:600}
@@ -75,12 +74,8 @@
 .media-action:active{transform:scale(.98)}
 .media-action:disabled{opacity:.65;cursor:wait}
 .download-options{display:none!important}
+
 @keyframes media-in{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-@media (min-width:520px){
-  .media-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-
-@media (prefers-reduced-motion:reduce){
-  .theme-thumb,.theme-side,.media-card,.carousel-image,.carousel-btn,.media-action{transition:none!important;animation:none!important}
-}
+@media (min-width:520px){.media-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.theme-thumb,.theme-side,.media-card,.carousel-image,.carousel-btn,.media-action{transition:none!important;animation:none!important}}
