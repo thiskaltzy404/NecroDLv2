@@ -67,7 +67,43 @@
     requestAnimationFrame(() => {
       document.body.classList.add('is-ready');
     });
+    initRipples();
   });
+
+  /* ------------------------------------------------------------------ */
+  /* Tap ripple — small visual feedback so buttons feel pressed, not     */
+  /* just clicked. Purely cosmetic, respects prefers-reduced-motion via  */
+  /* the CSS animation duration override.                                */
+  /* ------------------------------------------------------------------ */
+
+  function spawnRipple(target, x, y) {
+    const rect = target.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 1.4;
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple-el';
+    ripple.style.width = `${size}px`;
+    ripple.style.height = `${size}px`;
+    ripple.style.left = `${x - rect.left - size / 2}px`;
+    ripple.style.top = `${y - rect.top - size / 2}px`;
+    target.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+  }
+
+  function initRipples() {
+    const rippleTargets = document.querySelectorAll(
+      '.btn-download, .btn-ghost, .social-btn'
+    );
+
+    rippleTargets.forEach((el) => {
+      el.addEventListener('pointerdown', (e) => {
+        const x = e.clientX ?? e.touches?.[0]?.clientX;
+        const y = e.clientY ?? e.touches?.[0]?.clientY;
+        if (typeof x === 'number' && typeof y === 'number') {
+          spawnRipple(el, x, y);
+        }
+      });
+    });
+  }
 
   /* ------------------------------------------------------------------ */
   /* Platform detection (frontend-only, no requests made)                */

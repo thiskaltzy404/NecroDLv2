@@ -45,8 +45,10 @@
   --space-7: 64px;
 
   --ease-out: cubic-bezier(.16,.84,.44,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
   --dur-fast: 180ms;
   --dur-med: 320ms;
+  --ripple-ghost: rgba(120,170,255,0.32);
 
   color-scheme: dark;
 }
@@ -68,6 +70,7 @@
   --input-bg: rgba(255, 255, 255, 0.6);
   --ghost-bg: rgba(70, 90, 160, 0.08);
   --ghost-border: rgba(70, 90, 160, 0.18);
+  --ripple-ghost: rgba(59,130,246,0.22);
 
   color-scheme: light;
 }
@@ -176,16 +179,16 @@ input:focus-visible{
 }
 
 @keyframes drift-a{
-  0%,100%{ transform: translate(0,0) scale(1); }
-  50%{ transform: translate(4vw, 3vh) scale(1.08); }
+  0%,100%{ transform: translate(0,0) scale(1); filter: hue-rotate(0deg); }
+  50%{ transform: translate(4vw, 3vh) scale(1.1); filter: hue-rotate(15deg); }
 }
 @keyframes drift-b{
-  0%,100%{ transform: translate(0,0) scale(1); }
-  50%{ transform: translate(-5vw, 4vh) scale(1.06); }
+  0%,100%{ transform: translate(0,0) scale(1); filter: hue-rotate(0deg); }
+  50%{ transform: translate(-5vw, 4vh) scale(1.08); filter: hue-rotate(-12deg); }
 }
 @keyframes drift-c{
-  0%,100%{ transform: translate(0,0) scale(1); }
-  50%{ transform: translate(3vw, -3vh) scale(1.1); }
+  0%,100%{ transform: translate(0,0) scale(1); filter: hue-rotate(0deg); }
+  50%{ transform: translate(3vw, -3vh) scale(1.12); filter: hue-rotate(10deg); }
 }
 
 /* ==========================================================================
@@ -204,6 +207,48 @@ input:focus-visible{
     inset 0 1px 0 var(--glass-highlight);
   padding: var(--space-4);
   width: 100%;
+  animation: glass-float 7s ease-in-out infinite;
+}
+
+/* Periodic light sheen — the "liquid" glint sweeping across the glass.
+   border-radius:inherit clips the gradient to the card's own rounded
+   corners without touching overflow, so button glows never get cut off. */
+.glass-card::after{
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg,
+    transparent 38%,
+    rgba(255,255,255,0.10) 47%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(255,255,255,0.10) 53%,
+    transparent 62%);
+  transform: translateX(-130%);
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  animation: card-sheen 8s ease-in-out infinite;
+}
+
+:root[data-theme="light"] .glass-card::after{
+  mix-blend-mode: soft-light;
+  background: linear-gradient(115deg,
+    transparent 38%,
+    rgba(120,150,255,0.10) 47%,
+    rgba(120,150,255,0.28) 50%,
+    rgba(120,150,255,0.10) 53%,
+    transparent 62%);
+}
+
+@keyframes glass-float{
+  0%, 100%{ transform: translateY(0); }
+  50%{ transform: translateY(-5px); }
+}
+
+@keyframes card-sheen{
+  0%{ transform: translateX(-130%); }
+  16%{ transform: translateX(130%); }
+  100%{ transform: translateX(130%); }
 }
 
 /* ==========================================================================
@@ -305,10 +350,12 @@ main{
   color: var(--text-faint);
   position: relative;
   z-index: 1;
-  transition: color var(--dur-fast) var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out), transform 320ms var(--ease-spring);
 }
 .theme-toggle[aria-pressed="false"] .icon-moon{ color: var(--cyan); }
 .theme-toggle[aria-pressed="true"] .icon-sun{ color: var(--blue); }
+.theme-toggle[aria-pressed="true"] .icon-moon{ transform: rotate(-25deg) scale(1.1); }
+.theme-toggle[aria-pressed="false"] .icon-sun{ transform: rotate(25deg) scale(1.1); }
 
 .theme-thumb{
   position: absolute;
@@ -318,10 +365,14 @@ main{
   border-radius: 50%;
   background: linear-gradient(135deg, var(--blue), var(--purple));
   box-shadow: 0 0 10px rgba(96,165,250,0.6);
-  transition: transform var(--dur-med) var(--ease-out);
+  transition: transform 380ms var(--ease-spring);
 }
 .theme-toggle[aria-pressed="true"] .theme-thumb{
   transform: translateX(calc(var(--w) - var(--h)));
+}
+.theme-toggle:active .theme-thumb{ transform: scale(0.9) translateX(0); }
+.theme-toggle[aria-pressed="true"]:active .theme-thumb{
+  transform: scale(0.9) translateX(calc(var(--w) - var(--h)));
 }
 
 /* ==========================================================================
@@ -445,6 +496,8 @@ main{
 }
 
 .btn-ghost{
+  position: relative;
+  overflow: hidden;
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -460,16 +513,21 @@ main{
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  transition: transform 220ms var(--ease-spring), background var(--dur-fast) var(--ease-out);
 }
 
-.btn-ghost svg{ width: 16px; height: 16px; }
+.btn-ghost svg{
+  width: 16px; height: 16px;
+  transition: transform 220ms var(--ease-spring);
+}
 
 .btn-ghost:hover{
   background: var(--glass-bg-strong);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
-.btn-ghost:active{ transform: scale(0.97); }
+.btn-ghost:hover svg{ transform: scale(1.12) rotate(-6deg); }
+.btn-ghost:active{ transform: scale(0.95); }
+.btn-ghost:active svg{ transform: scale(0.95) rotate(0deg); }
 
 .input-status{
   margin: 0;
@@ -482,6 +540,8 @@ main{
 .input-status[data-state="unknown"]{ color: var(--pink); }
 
 .btn-download{
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -496,16 +556,23 @@ main{
   font-size: 1rem;
   color: #ffffff;
   background: linear-gradient(120deg, var(--blue) 0%, var(--purple) 100%);
-  box-shadow: 0 12px 30px -10px rgba(139,92,246,0.55), inset 0 1px 0 rgba(255,255,255,0.3);
-  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  transition: transform 220ms var(--ease-spring);
+  animation: btn-pulse 3.2s ease-in-out infinite;
 }
-.btn-download svg{ width: 20px; height: 20px; }
+.btn-download svg{
+  width: 20px; height: 20px;
+  transition: transform 220ms var(--ease-spring);
+}
 
-.btn-download:hover{
-  transform: translateY(-2px);
-  box-shadow: 0 16px 36px -8px rgba(139,92,246,0.65), inset 0 1px 0 rgba(255,255,255,0.35);
+.btn-download:hover{ transform: translateY(-2px) scale(1.015); }
+.btn-download:hover svg{ transform: translateY(2px); }
+.btn-download:active{ transform: scale(0.96); }
+.btn-download:active svg{ transform: translateY(4px) scale(0.9); }
+
+@keyframes btn-pulse{
+  0%, 100%{ box-shadow: 0 12px 30px -10px rgba(139,92,246,0.5), inset 0 1px 0 rgba(255,255,255,0.3); }
+  50%{ box-shadow: 0 18px 40px -6px rgba(96,165,250,0.7), inset 0 1px 0 rgba(255,255,255,0.35); }
 }
-.btn-download:active{ transform: scale(0.98); }
 
 /* ==========================================================================
    Platform section
@@ -598,6 +665,8 @@ main{
 }
 
 .social-btn{
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -608,15 +677,21 @@ main{
   color: #ffffff;
   font-size: 0.85rem;
   font-weight: 600;
-  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  transition: transform 220ms var(--ease-spring), box-shadow var(--dur-fast) var(--ease-out);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
 }
 
 .social-btn svg{ width: 17px; height: 17px; flex-shrink: 0; }
-.social-btn .arrow{ width: 14px; height: 14px; margin-left: -2px; opacity: 0.8; }
+.social-btn .arrow{
+  width: 14px; height: 14px;
+  margin-left: -2px;
+  opacity: 0.8;
+  transition: transform 220ms var(--ease-spring);
+}
 
-.social-btn:hover{ transform: translateY(-2px); }
-.social-btn:active{ transform: scale(0.97); }
+.social-btn:hover{ transform: translateY(-2px) scale(1.02); }
+.social-btn:hover .arrow{ transform: translateX(3px); }
+.social-btn:active{ transform: scale(0.96); }
 
 .social-whatsapp{
   background: linear-gradient(120deg, #22c55e, #16a34a);
@@ -663,6 +738,27 @@ main{
 }
 
 /* ==========================================================================
+   Tap ripple (added on pointerdown by script.js)
+   ========================================================================== */
+
+.ripple-el{
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: rgba(255,255,255,0.5);
+  pointer-events: none;
+  animation: ripple-out 550ms ease-out forwards;
+}
+
+.btn-ghost .ripple-el{
+  background: var(--ripple-ghost);
+}
+
+@keyframes ripple-out{
+  to{ transform: scale(2.4); opacity: 0; }
+}
+
+/* ==========================================================================
    Toast
    ========================================================================== */
 
@@ -701,24 +797,26 @@ main{
   opacity: 0;
 }
 
+.is-ready [data-animate]{
+  animation-delay: calc(var(--d, 0) * 90ms);
+}
 .is-ready [data-animate="fade-down"]{
-  animation: fade-down var(--dur-med) var(--ease-out) forwards;
+  animation: fade-down 680ms var(--ease-out) forwards;
+  animation-delay: calc(var(--d, 0) * 90ms);
 }
 .is-ready [data-animate="fade-up"]{
-  animation: fade-up 620ms var(--ease-out) forwards;
+  animation: fade-up 720ms var(--ease-out) forwards;
+  animation-delay: calc(var(--d, 0) * 90ms);
 }
-.is-ready [data-animate][data-delay="1"]{ animation-delay: 90ms; }
-.is-ready [data-animate][data-delay="2"]{ animation-delay: 180ms; }
-.is-ready [data-animate][data-delay="3"]{ animation-delay: 270ms; }
-.is-ready [data-animate][data-delay="4"]{ animation-delay: 360ms; }
 
+/* A soft blur-to-sharp "materializing" glass feel, not just a plain slide. */
 @keyframes fade-down{
-  from{ opacity: 0; transform: translateY(-14px); }
-  to{ opacity: 1; transform: translateY(0); }
+  from{ opacity: 0; transform: translateY(-18px); filter: blur(5px); }
+  to{ opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 @keyframes fade-up{
-  from{ opacity: 0; transform: translateY(22px); }
-  to{ opacity: 1; transform: translateY(0); }
+  from{ opacity: 0; transform: translateY(28px) scale(.97); filter: blur(7px); }
+  to{ opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 /* ==========================================================================

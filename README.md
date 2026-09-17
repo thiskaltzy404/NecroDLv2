@@ -12,9 +12,10 @@ NecroDL/
 ├── style.css
 ├── script.js
 ├── README.md
-└── assets/
-    └── necrodl-logo.png
+└── necrodl-logo.png
 ```
+
+Struktur sengaja dibuat flat (logo sejajar dengan file lain, tanpa subfolder) supaya gampang di-upload ulang lewat GitHub mobile web tanpa perlu bikin folder terpisah.
 
 ## Cara menjalankan
 
@@ -42,7 +43,10 @@ Lalu buka `http://localhost:8000` (atau alamat LAN kamu untuk tes di HP).
 - **Community section** — logo NecroDL asli + 3 tombol sosial yang benar-benar bisa diklik (WhatsApp, Telegram, TikTok), semua `target="_blank"` + `rel="noopener noreferrer"`.
 - **Footer** sederhana dengan garis gradient tipis.
 - **Tema dark/light** tersimpan di `localStorage` dengan key `necrodl-theme` (default: dark).
-- **Animasi masuk** bertahap saat halaman pertama dibuka, menghormati `prefers-reduced-motion`.
+- **Animasi masuk** bertahap per elemen (header → eyebrow → headline → deskripsi → tiap card → footer) dengan efek "materialize" (blur + fade + slide).
+- **Liquid glass yang benar-benar hidup**: tiap glass card melayang pelan (idle float) dan ada kilau cahaya yang lewat secara berkala.
+- **Feedback sentuhan** di semua tombol (Paste, Clear, Download, tombol sosial): efek ripple saat ditekan, ikon yang bergerak halus saat hover/tekan, dan animasi pulse pada glow tombol Download.
+- Semua animasi menghormati `prefers-reduced-motion` — kalau tidak ada animasi sama sekali yang muncul, cek pengaturan "Hapus animasi" / "Reduce motion" di HP kamu, karena setting itu sengaja mematikan semuanya untuk aksesibilitas.
 - Mobile-first, sudah dicek dari 320px sampai 1440px+ tanpa horizontal scroll, touch target tombol ≥ 44px.
 
 ## Mengganti logo
