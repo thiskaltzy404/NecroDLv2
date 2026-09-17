@@ -13,7 +13,6 @@
   const inputStatus = document.getElementById('inputStatus');
   const toastEl = document.getElementById('toast');
   const mediaResult = document.getElementById('mediaResult');
-  const downloadOptions = document.getElementById('downloadOptions');
 
   function applyTheme(theme) {
     const light = theme === 'light';
@@ -126,10 +125,6 @@
       mediaResult.hidden = true;
       mediaResult.innerHTML = '';
     }
-    if (downloadOptions) {
-      downloadOptions.hidden = true;
-      downloadOptions.innerHTML = '';
-    }
     downloadBtn.style.display = '';
     downloadBtn.disabled = false;
     downloadBtn.innerHTML = '<span>Download</span>';
@@ -143,32 +138,32 @@
     return '';
   }
 
-  function normalizeItems(data) {
-    const raw = data?.photos || data?.images || data?.media || data?.items || data?.entries || [];
-    if (!Array.isArray(raw)) return [];
+  function normalizePhotos(data) {
+    const raw = Array.isArray(data?.photos) ? data.photos : [];
     return raw.map((item, index) => {
-      if (typeof item === 'string') return { url: item, thumbnail: item, index };
-      const url = firstValue(item, ['url', 'download_url', 'downloadUrl', 'src', 'media_url', 'mediaUrl', 'video_url', 'videoUrl']);
-      const thumbnail = firstValue(item, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'preview', 'preview_url', 'cover', 'cover_url']) || url;
-      return { ...item, url, thumbnail, index };
-    }).filter(item => item.url || item.thumbnail);
-  }
-
-  function getThumbnail(data) {
-    return firstValue(data, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'cover', 'cover_url', 'preview', 'preview_url']);
+      if (typeof item === 'string') return { index, thumbnail: item };
+      return {
+        index: Number.isInteger(item?.index) ? item.index : index,
+        thumbnail: firstValue(item, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'preview', 'preview_url', 'url']),
+        url: firstValue(item, ['url', 'download_url', 'downloadUrl']),
+        title: firstValue(item, ['title'])
+      };
+    }).filter(item => item.thumbnail || item.url);
   }
 
   function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+    }[char]));
   }
 
   function createMediaPreview(info, sourceUrl, platform) {
     if (!mediaResult) return;
 
-    const items = normalizeItems(info);
-    const isPhoto = info.media_type === 'photo' || items.length > 0 || Array.isArray(info.photos) || Array.isArray(info.images);
-    const thumbnail = getThumbnail(info) || items[0]?.thumbnail || '';
-    const title = firstValue(info, ['title', 'description', 'caption']) || `${platform.label} media`;
+    const photos = normalizePhotos(info);
+    const isPhoto = info.media_type === 'photo' || photos.length > 0;
+    const thumbnail = firstValue(info, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'cover', 'cover_url', 'preview', 'preview_url']);
+    const title = firstValue(info, ['title', 'description']) || `${platform.label} media`;
 
     mediaResult.hidden = false;
     mediaResult.innerHTML = '';
@@ -176,41 +171,41 @@
     const card = document.createElement('div');
     card.className = 'glass-card media-card';
 
-    const titleEl = document.createElement('div');
-    titleEl.className = 'media-heading';
-    titleEl.innerHTML = `<span class="media-type">${isPhoto ? (items.length > 1 ? `${items.length} photos` : 'Photo') : 'Video'}</span><h2>${escapeHtml(title)}</h2>`;
-    card.appendChild(titleEl);
+    const heading = document.createElement('div');
+    heading.className = 'media-heading';
+    heading.innerHTML = `<span class="media-type">${isPhoto ? (photos.length > 1 ? `${photos.length} Photos` : 'Photo') : 'Video'}</span><h2>${escapeHtml(title)}</h2>`;
+    card.appendChild(heading);
 
-    if (isPhoto && items.length > 0) {
-      renderPhotoCarousel(card, items, sourceUrl);
+    if (isPhoto && photos.length) {
+      renderPhotoCarousel(card, photos, sourceUrl);
     } else if (thumbnail) {
       const preview = document.createElement('div');
       preview.className = 'media-preview';
-      preview.innerHTML = `<img src="${escapeHtml(thumbnail)}" alt="Thumbnail media" loading="eager" referrerpolicy="no-referrer">`;
+      const img = document.createElement('img');
+      img.src = thumbnail;
+      img.alt = 'Media thumbnail';
+      img.loading = 'eager';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => { preview.classList.add('media-preview-empty'); img.remove(); preview.textContent = 'Thumbnail tidak dapat ditampilkan.'; };
+      preview.appendChild(img);
       card.appendChild(preview);
     } else {
       const empty = document.createElement('div');
       empty.className = 'media-preview media-preview-empty';
-      empty.textContent = 'Thumbnail tidak diberikan oleh API.';
+      empty.textContent = 'Thumbnail tidak tersedia dari platform.';
       card.appendChild(empty);
     }
 
     const actions = document.createElement('div');
     actions.className = 'media-actions';
-
-    if (isPhoto) {
-      addMediaAction(actions, 'Download Photo', 'photo', sourceUrl, items.length > 1 ? 0 : null);
-    } else {
-      addMediaAction(actions, 'Download Video', 'video', sourceUrl);
-    }
-    if (info.has_audio || info.audio || info.audio_url || info.audioUrl) {
-      addMediaAction(actions, 'Download Audio / MP3', 'audio', sourceUrl);
-    }
+    if (!isPhoto) addMediaAction(actions, 'Download Video', 'video', sourceUrl);
+    if (isPhoto && photos.length === 1) addMediaAction(actions, 'Download Photo', 'photo', sourceUrl, 0);
+    if (info.has_audio) addMediaAction(actions, 'Download Audio / MP3', 'audio', sourceUrl);
     card.appendChild(actions);
     mediaResult.appendChild(card);
   }
 
-  function renderPhotoCarousel(card, items, sourceUrl) {
+  function renderPhotoCarousel(card, photos, sourceUrl) {
     const wrapper = document.createElement('div');
     wrapper.className = 'photo-carousel';
     let current = 0;
@@ -226,78 +221,73 @@
 
     const controls = document.createElement('div');
     controls.className = 'carousel-controls';
-
     const prev = document.createElement('button');
     prev.type = 'button';
     prev.className = 'carousel-btn';
     prev.setAttribute('aria-label', 'Foto sebelumnya');
     prev.textContent = '‹';
-
     const counter = document.createElement('span');
     counter.className = 'carousel-counter';
-
     const next = document.createElement('button');
     next.type = 'button';
     next.className = 'carousel-btn';
     next.setAttribute('aria-label', 'Foto berikutnya');
     next.textContent = '›';
 
-    // Arrows intentionally appear only when there are at least 2 photos.
-    if (items.length > 1) {
+    // Navigation exists only when there is more than one photo.
+    if (photos.length > 1) {
       controls.append(prev, counter, next);
       wrapper.appendChild(controls);
     }
 
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'media-action primary';
+    action.textContent = photos.length > 1 ? 'Download Foto Ini' : 'Download Photo';
+    wrapper.appendChild(action);
+
     function render() {
-      const item = items[current];
-      image.src = item.thumbnail || item.url;
-      image.alt = `Foto ${current + 1} dari ${items.length}`;
-      counter.textContent = `${current + 1} / ${items.length}`;
+      const photo = photos[current];
+      image.src = photo.thumbnail || photo.url;
+      image.alt = `Foto ${current + 1} dari ${photos.length}`;
+      counter.textContent = `${current + 1} / ${photos.length}`;
+      action.dataset.index = String(photo.index ?? current);
+      image.onerror = () => {
+        if (photo.url && image.src !== photo.url) image.src = photo.url;
+      };
     }
 
     function go(delta) {
-      current = (current + delta + items.length) % items.length;
+      current = (current + delta + photos.length) % photos.length;
       render();
-      const downloadPhoto = card.querySelector('[data-current-photo]');
-      if (downloadPhoto) downloadPhoto.dataset.photoIndex = String(current);
     }
 
     prev.addEventListener('click', () => go(-1));
     next.addEventListener('click', () => go(1));
-    render();
-
-    const action = document.createElement('button');
-    action.type = 'button';
-    action.className = 'media-action primary';
-    action.dataset.currentPhoto = 'true';
-    action.dataset.photoIndex = '0';
-    action.textContent = items.length > 1 ? 'Download Foto Ini' : 'Download Photo';
     action.addEventListener('click', () => {
-      const item = items[Number(action.dataset.photoIndex) || 0];
-      startDownload(item.url || sourceUrl, 'photo', action, Number(action.dataset.photoIndex) || 0, sourceUrl);
+      const index = Number(action.dataset.index);
+      startDownload(sourceUrl, 'photo', action, Number.isFinite(index) ? index : current);
     });
-    wrapper.appendChild(action);
-
+    render();
     card.appendChild(wrapper);
   }
 
   function addMediaAction(container, label, kind, sourceUrl, index = null) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'media-action' + (kind === 'video' || kind === 'photo' ? ' primary' : '');
+    button.className = `media-action${kind === 'video' || kind === 'photo' ? ' primary' : ''}`;
     button.textContent = label;
-    button.addEventListener('click', () => startDownload(sourceUrl, kind, button, index, sourceUrl));
+    button.addEventListener('click', () => startDownload(sourceUrl, kind, button, index));
     container.appendChild(button);
   }
 
-  function startDownload(url, kind, button, index = null, fallbackUrl = url) {
-    if (!url) return;
+  function startDownload(sourceUrl, kind, button, index = null) {
+    if (!sourceUrl) return;
     const original = button.textContent;
     button.disabled = true;
-    button.textContent = 'Menyiapkan...';
-    const params = new URLSearchParams({ url: url, kind: kind });
+    button.textContent = 'Preparing...';
+    const params = new URLSearchParams({ url: sourceUrl, kind });
     if (index !== null && Number.isFinite(index)) params.set('index', String(index));
-    if (fallbackUrl && fallbackUrl !== url) params.set('source', fallbackUrl);
     const href = `${API_BASE}/api/download?${params.toString()}`;
     const link = document.createElement('a');
     link.href = href;
@@ -307,7 +297,10 @@
     link.click();
     link.remove();
     showToast('Download sedang diproses...');
-    setTimeout(() => { button.disabled = false; button.textContent = original; }, 2500);
+    setTimeout(() => {
+      button.disabled = false;
+      button.textContent = original;
+    }, 2500);
   }
 
   async function getMediaInfo(url) {
@@ -336,7 +329,6 @@
 
     try {
       const info = await getMediaInfo(value);
-      console.log('NecroDL API:', info);
       inputStatus.textContent = `${info.title || platform.label} — siap didownload.`;
       inputStatus.setAttribute('data-state', 'detected');
       downloadBtn.style.display = 'none';
