@@ -1,14 +1,9 @@
-/* ==========================================================================
-   NecroDL — script.js
-   Connected to NecroDL API
-   ========================================================================== */
-
+/* NecroDL frontend controller */
 (function () {
   'use strict';
 
   const API_BASE = 'https://necrodlapi-iz9wptub.b4a.run';
   const THEME_KEY = 'necrodl-theme';
-
   const root = document.documentElement;
   const themeToggle = document.getElementById('themeToggle');
   const urlInput = document.getElementById('urlInput');
@@ -17,495 +12,344 @@
   const downloadBtn = document.getElementById('downloadBtn');
   const inputStatus = document.getElementById('inputStatus');
   const toastEl = document.getElementById('toast');
-
-  /* ------------------------------------------------------------------ */
-  /* Theme                                                               */
-  /* ------------------------------------------------------------------ */
+  const mediaResult = document.getElementById('mediaResult');
+  const downloadOptions = document.getElementById('downloadOptions');
 
   function applyTheme(theme) {
-    if (theme === 'light') {
-      root.setAttribute('data-theme', 'light');
-      themeToggle.setAttribute('aria-pressed', 'true');
-      themeToggle.setAttribute('aria-label', 'Ganti ke mode gelap');
-    } else {
-      root.setAttribute('data-theme', 'dark');
-      themeToggle.setAttribute('aria-pressed', 'false');
-      themeToggle.setAttribute('aria-label', 'Ganti ke mode terang');
+    const light = theme === 'light';
+    root.setAttribute('data-theme', light ? 'light' : 'dark');
+    if (themeToggle) {
+      themeToggle.setAttribute('aria-pressed', String(light));
+      themeToggle.setAttribute('aria-label', light ? 'Ganti ke mode gelap' : 'Ganti ke mode terang');
     }
   }
 
   function initTheme() {
     let saved = null;
-
-    try {
-      saved = localStorage.getItem(THEME_KEY);
-    } catch (err) {
-      saved = null;
-    }
-
+    try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
     applyTheme(saved === 'light' ? 'light' : 'dark');
   }
 
-  function toggleTheme() {
-    const isLight = root.getAttribute('data-theme') === 'light';
-    const next = isLight ? 'dark' : 'light';
-
+  themeToggle?.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     applyTheme(next);
-
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch (err) {}
-  }
-
-  if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Entrance animation                                                  */
-  /* ------------------------------------------------------------------ */
-
-  window.addEventListener('DOMContentLoaded', () => {
-    initTheme();
-
-    requestAnimationFrame(() => {
-      document.body.classList.add('is-ready');
-    });
-
-    initRipples();
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
   });
 
-  /* ------------------------------------------------------------------ */
-  /* Ripple                                                              */
-  /* ------------------------------------------------------------------ */
+  document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    requestAnimationFrame(() => document.body.classList.add('is-ready'));
+    initRipples();
+  });
 
   function spawnRipple(target, x, y) {
     const rect = target.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height) * 1.4;
-
     const ripple = document.createElement('span');
-
     ripple.className = 'ripple-el';
     ripple.style.width = `${size}px`;
     ripple.style.height = `${size}px`;
     ripple.style.left = `${x - rect.left - size / 2}px`;
     ripple.style.top = `${y - rect.top - size / 2}px`;
-
     target.appendChild(ripple);
-
-    ripple.addEventListener('animationend', () => {
-      ripple.remove();
-    });
+    ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
   }
 
   function initRipples() {
-    const rippleTargets = document.querySelectorAll(
-      '.btn-download, .btn-ghost, .social-btn'
-    );
-
-    rippleTargets.forEach((el) => {
-      el.addEventListener('pointerdown', (e) => {
-        const x = e.clientX ?? e.touches?.[0]?.clientX;
-        const y = e.clientY ?? e.touches?.[0]?.clientY;
-
-        if (typeof x === 'number' && typeof y === 'number') {
-          spawnRipple(el, x, y);
-        }
+    document.querySelectorAll('.btn-download, .btn-ghost, .social-btn, .media-action, .carousel-btn').forEach(el => {
+      el.addEventListener('pointerdown', e => {
+        if (typeof e.clientX === 'number') spawnRipple(el, e.clientX, e.clientY);
       });
     });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Platform detection                                                  */
-  /* ------------------------------------------------------------------ */
-
   const PLATFORMS = [
-    {
-      id: 'tiktok',
-      label: 'TikTok',
-      test: /tiktok\.com/i
-    },
-    {
-      id: 'instagram',
-      label: 'Instagram',
-      test: /instagram\.com/i
-    },
-    {
-      id: 'youtube',
-      label: 'YouTube',
-      test: /(youtube\.com|youtu\.be)/i
-    },
-    {
-      id: 'x',
-      label: 'X',
-      test: /(x\.com|twitter\.com)/i
-    }
+    { id: 'tiktok', label: 'TikTok', test: /tiktok\.com/i },
+    { id: 'instagram', label: 'Instagram', test: /instagram\.com/i },
+    { id: 'youtube', label: 'YouTube', test: /(youtube\.com|youtu\.be)/i },
+    { id: 'x', label: 'X', test: /(x\.com|twitter\.com)/i }
   ];
 
   function detectPlatform(value) {
-    for (const platform of PLATFORMS) {
-      if (platform.test.test(value)) {
-        return platform;
-      }
-    }
-
-    return null;
+    return PLATFORMS.find(platform => platform.test.test(value)) || null;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Toast                                                               */
-  /* ------------------------------------------------------------------ */
-
-  let toastTimer = null;
-
+  let toastTimer;
   function showToast(message) {
     if (!toastEl) return;
-
     toastEl.textContent = message;
     toastEl.classList.add('show');
-
     clearTimeout(toastTimer);
-
-    toastTimer = setTimeout(() => {
-      toastEl.classList.remove('show');
-    }, 3000);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3200);
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Status                                                              */
-  /* ------------------------------------------------------------------ */
 
   function updateStatus(value) {
     const trimmed = value.trim();
-
     if (!trimmed) {
       inputStatus.textContent = 'Masukkan URL untuk memulai.';
       inputStatus.removeAttribute('data-state');
       return;
     }
-
     const platform = detectPlatform(trimmed);
-
-    if (platform) {
-      inputStatus.textContent =
-        `Terdeteksi: ${platform.label}. Siap diproses.`;
-
-      inputStatus.setAttribute('data-state', 'detected');
-    } else {
-      inputStatus.textContent =
-        'URL belum dikenali. Pastikan link berasal dari platform yang didukung.';
-
-      inputStatus.setAttribute('data-state', 'unknown');
-    }
+    inputStatus.textContent = platform
+      ? `Terdeteksi: ${platform.label}. Siap diproses.`
+      : 'URL belum dikenali. Pastikan link berasal dari platform yang didukung.';
+    inputStatus.setAttribute('data-state', platform ? 'detected' : 'unknown');
   }
 
-  if (urlInput) {
-    urlInput.addEventListener('input', () => {
+  urlInput?.addEventListener('input', () => updateStatus(urlInput.value));
+
+  pasteBtn?.addEventListener('click', async () => {
+    try {
+      if (!navigator.clipboard?.readText) throw new Error('clipboard');
+      const text = await navigator.clipboard.readText();
+      if (!text) return showToast('Clipboard kosong. Salin link terlebih dahulu.');
+      urlInput.value = text.trim();
       updateStatus(urlInput.value);
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Paste                                                               */
-  /* ------------------------------------------------------------------ */
-
-  if (pasteBtn) {
-    pasteBtn.addEventListener('click', async () => {
-      if (!navigator.clipboard || !navigator.clipboard.readText) {
-        showToast(
-          'Browser tidak mengizinkan clipboard. Tempel link secara manual.'
-        );
-
-        urlInput.focus();
-        return;
-      }
-
-      try {
-        const text = await navigator.clipboard.readText();
-
-        if (!text) {
-          showToast('Clipboard kosong. Salin link terlebih dahulu.');
-          return;
-        }
-
-        urlInput.value = text.trim();
-
-        updateStatus(urlInput.value);
-
-        showToast('Link berhasil ditempel.');
-
-        urlInput.focus();
-      } catch (err) {
-        showToast(
-          'Izin clipboard ditolak. Silakan tempel link secara manual.'
-        );
-
-        urlInput.focus();
-      }
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Clear                                                               */
-  /* ------------------------------------------------------------------ */
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      urlInput.value = '';
-
-      updateStatus('');
-
-      removeDownloadOptions();
-
+      showToast('Link berhasil ditempel.');
       urlInput.focus();
-    });
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Download options                                                    */
-  /* ------------------------------------------------------------------ */
-
-  let downloadOptions = null;
-
-  function createDownloadOptions() {
-    if (downloadOptions) return downloadOptions;
-
-    downloadOptions = document.createElement('div');
-
-    downloadOptions.id = 'downloadOptions';
-
-    downloadOptions.style.display = 'flex';
-    downloadOptions.style.flexDirection = 'column';
-    downloadOptions.style.gap = '10px';
-    downloadOptions.style.marginTop = '12px';
-
-    downloadBtn.insertAdjacentElement(
-      'afterend',
-      downloadOptions
-    );
-
-    return downloadOptions;
-  }
-
-  function removeDownloadOptions() {
-    if (downloadOptions) {
-      downloadOptions.remove();
-      downloadOptions = null;
+    } catch (_) {
+      showToast('Tempel link secara manual pada kolom URL.');
+      urlInput.focus();
     }
+  });
 
+  clearBtn?.addEventListener('click', () => {
+    urlInput.value = '';
+    updateStatus('');
+    clearResults();
+    urlInput.focus();
+  });
+
+  function clearResults() {
+    if (mediaResult) {
+      mediaResult.hidden = true;
+      mediaResult.innerHTML = '';
+    }
+    if (downloadOptions) {
+      downloadOptions.hidden = true;
+      downloadOptions.innerHTML = '';
+    }
     downloadBtn.style.display = '';
     downloadBtn.disabled = false;
-    downloadBtn.textContent = 'Download';
+    downloadBtn.innerHTML = '<span>Download</span>';
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Create download button                                              */
-  /* ------------------------------------------------------------------ */
+  function firstValue(obj, keys) {
+    for (const key of keys) {
+      const value = obj?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  }
 
-  function addDownloadButton(label, kind, url) {
-    const container = createDownloadOptions();
+  function normalizeItems(data) {
+    const raw = data?.photos || data?.images || data?.media || data?.items || data?.entries || [];
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item, index) => {
+      if (typeof item === 'string') return { url: item, thumbnail: item, index };
+      const url = firstValue(item, ['url', 'download_url', 'downloadUrl', 'src', 'media_url', 'mediaUrl', 'video_url', 'videoUrl']);
+      const thumbnail = firstValue(item, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'preview', 'preview_url', 'cover', 'cover_url']) || url;
+      return { ...item, url, thumbnail, index };
+    }).filter(item => item.url || item.thumbnail);
+  }
 
-    const button = document.createElement('button');
+  function getThumbnail(data) {
+    return firstValue(data, ['thumbnail', 'thumbnail_url', 'thumbnailUrl', 'cover', 'cover_url', 'preview', 'preview_url']);
+  }
 
-    button.type = 'button';
-    button.className = 'btn-ghost';
-    button.textContent = label;
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+  }
 
-    button.style.width = '100%';
-    button.style.cursor = 'pointer';
+  function createMediaPreview(info, sourceUrl, platform) {
+    if (!mediaResult) return;
 
-    button.addEventListener('click', () => {
-      startDownload(url, kind, button);
+    const items = normalizeItems(info);
+    const isPhoto = info.media_type === 'photo' || items.length > 0 || Array.isArray(info.photos) || Array.isArray(info.images);
+    const thumbnail = getThumbnail(info) || items[0]?.thumbnail || '';
+    const title = firstValue(info, ['title', 'description', 'caption']) || `${platform.label} media`;
+
+    mediaResult.hidden = false;
+    mediaResult.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'glass-card media-card';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'media-heading';
+    titleEl.innerHTML = `<span class="media-type">${isPhoto ? (items.length > 1 ? `${items.length} photos` : 'Photo') : 'Video'}</span><h2>${escapeHtml(title)}</h2>`;
+    card.appendChild(titleEl);
+
+    if (isPhoto && items.length > 0) {
+      renderPhotoCarousel(card, items, sourceUrl);
+    } else if (thumbnail) {
+      const preview = document.createElement('div');
+      preview.className = 'media-preview';
+      preview.innerHTML = `<img src="${escapeHtml(thumbnail)}" alt="Thumbnail media" loading="eager" referrerpolicy="no-referrer">`;
+      card.appendChild(preview);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'media-preview media-preview-empty';
+      empty.textContent = 'Thumbnail tidak diberikan oleh API.';
+      card.appendChild(empty);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'media-actions';
+
+    if (isPhoto) {
+      addMediaAction(actions, 'Download Photo', 'photo', sourceUrl, items.length > 1 ? 0 : null);
+    } else {
+      addMediaAction(actions, 'Download Video', 'video', sourceUrl);
+    }
+    if (info.has_audio || info.audio || info.audio_url || info.audioUrl) {
+      addMediaAction(actions, 'Download Audio / MP3', 'audio', sourceUrl);
+    }
+    card.appendChild(actions);
+    mediaResult.appendChild(card);
+  }
+
+  function renderPhotoCarousel(card, items, sourceUrl) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'photo-carousel';
+    let current = 0;
+
+    const viewport = document.createElement('div');
+    viewport.className = 'carousel-viewport';
+    const image = document.createElement('img');
+    image.className = 'carousel-image';
+    image.loading = 'eager';
+    image.referrerPolicy = 'no-referrer';
+    viewport.appendChild(image);
+    wrapper.appendChild(viewport);
+
+    const controls = document.createElement('div');
+    controls.className = 'carousel-controls';
+
+    const prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'carousel-btn';
+    prev.setAttribute('aria-label', 'Foto sebelumnya');
+    prev.textContent = '‹';
+
+    const counter = document.createElement('span');
+    counter.className = 'carousel-counter';
+
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'carousel-btn';
+    next.setAttribute('aria-label', 'Foto berikutnya');
+    next.textContent = '›';
+
+    // Arrows intentionally appear only when there are at least 2 photos.
+    if (items.length > 1) {
+      controls.append(prev, counter, next);
+      wrapper.appendChild(controls);
+    }
+
+    function render() {
+      const item = items[current];
+      image.src = item.thumbnail || item.url;
+      image.alt = `Foto ${current + 1} dari ${items.length}`;
+      counter.textContent = `${current + 1} / ${items.length}`;
+    }
+
+    function go(delta) {
+      current = (current + delta + items.length) % items.length;
+      render();
+      const downloadPhoto = card.querySelector('[data-current-photo]');
+      if (downloadPhoto) downloadPhoto.dataset.photoIndex = String(current);
+    }
+
+    prev.addEventListener('click', () => go(-1));
+    next.addEventListener('click', () => go(1));
+    render();
+
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'media-action primary';
+    action.dataset.currentPhoto = 'true';
+    action.dataset.photoIndex = '0';
+    action.textContent = items.length > 1 ? 'Download Foto Ini' : 'Download Photo';
+    action.addEventListener('click', () => {
+      const item = items[Number(action.dataset.photoIndex) || 0];
+      startDownload(item.url || sourceUrl, 'photo', action, Number(action.dataset.photoIndex) || 0, sourceUrl);
     });
+    wrapper.appendChild(action);
 
+    card.appendChild(wrapper);
+  }
+
+  function addMediaAction(container, label, kind, sourceUrl, index = null) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'media-action' + (kind === 'video' || kind === 'photo' ? ' primary' : '');
+    button.textContent = label;
+    button.addEventListener('click', () => startDownload(sourceUrl, kind, button, index, sourceUrl));
     container.appendChild(button);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Start actual download                                               */
-  /* ------------------------------------------------------------------ */
-
-  function startDownload(url, kind, button) {
+  function startDownload(url, kind, button, index = null, fallbackUrl = url) {
     if (!url) return;
-
-    const originalText = button.textContent;
-
+    const original = button.textContent;
     button.disabled = true;
-    button.textContent = 'Menyiapkan download...';
-
-    showToast('Download sedang diproses...');
-
-    const downloadUrl =
-      `${API_BASE}/api/download?url=${encodeURIComponent(url)}&kind=${encodeURIComponent(kind)}`;
-
+    button.textContent = 'Menyiapkan...';
+    const params = new URLSearchParams({ url: url, kind: kind });
+    if (index !== null && Number.isFinite(index)) params.set('index', String(index));
+    if (fallbackUrl && fallbackUrl !== url) params.set('source', fallbackUrl);
+    const href = `${API_BASE}/api/download?${params.toString()}`;
     const link = document.createElement('a');
-
-    link.href = downloadUrl;
+    link.href = href;
     link.target = '_blank';
     link.rel = 'noopener';
-
     document.body.appendChild(link);
     link.click();
     link.remove();
-
-    setTimeout(() => {
-      button.disabled = false;
-      button.textContent = originalText;
-    }, 2500);
+    showToast('Download sedang diproses...');
+    setTimeout(() => { button.disabled = false; button.textContent = original; }, 2500);
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Ask backend for information                                         */
-  /* ------------------------------------------------------------------ */
 
   async function getMediaInfo(url) {
     const response = await fetch(`${API_BASE}/api/info`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: url
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
     });
-
-    let data = null;
-
-    try {
-      data = await response.json();
-    } catch (err) {
-      throw new Error('Respons server tidak valid.');
-    }
-
-    if (!response.ok || !data.ok) {
-      throw new Error(
-        data?.detail || 'URL tidak dapat diproses.'
-      );
-    }
-
+    let data;
+    try { data = await response.json(); } catch (_) { throw new Error('Respons server tidak valid.'); }
+    if (!response.ok || !data?.ok) throw new Error(data?.detail || data?.error || 'URL tidak dapat diproses.');
     return data;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Main download button                                                */
-  /* ------------------------------------------------------------------ */
+  downloadBtn?.addEventListener('click', async () => {
+    const value = urlInput.value.trim();
+    if (!value) { showToast('Tempelkan URL terlebih dahulu.'); urlInput.focus(); return; }
+    const platform = detectPlatform(value);
+    if (!platform) { showToast('URL belum dikenali. Pastikan link berasal dari platform yang didukung.'); return; }
 
-  if (downloadBtn) {
-    downloadBtn.addEventListener('click', async () => {
-      const value = urlInput.value.trim();
+    clearResults();
+    downloadBtn.disabled = true;
+    downloadBtn.innerHTML = '<span>Memeriksa...</span>';
+    inputStatus.textContent = `Menghubungi server untuk memproses ${platform.label}...`;
+    inputStatus.setAttribute('data-state', 'loading');
 
-      if (!value) {
-        showToast('Tempelkan URL terlebih dahulu.');
+    try {
+      const info = await getMediaInfo(value);
+      console.log('NecroDL API:', info);
+      inputStatus.textContent = `${info.title || platform.label} — siap didownload.`;
+      inputStatus.setAttribute('data-state', 'detected');
+      downloadBtn.style.display = 'none';
+      createMediaPreview(info, value, platform);
+    } catch (error) {
+      console.error('NecroDL Error:', error);
+      inputStatus.textContent = error.message || 'Terjadi kesalahan saat memproses URL.';
+      inputStatus.setAttribute('data-state', 'unknown');
+      showToast(error.message || 'Gagal memproses URL.');
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = '<span>Coba Lagi</span>';
+    }
+  });
 
-        urlInput.focus();
-
-        return;
-      }
-
-      const platform = detectPlatform(value);
-
-      if (!platform) {
-        showToast(
-          'URL belum dikenali. Pastikan link berasal dari platform yang didukung.'
-        );
-
-        return;
-      }
-
-      removeDownloadOptions();
-
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = 'Memeriksa...';
-
-      inputStatus.textContent =
-        `Menghubungi server untuk memproses ${platform.label}...`;
-
-      inputStatus.setAttribute('data-state', 'loading');
-
-      try {
-        const info = await getMediaInfo(value);
-
-        console.log('NecroDL API:', info);
-
-        removeDownloadOptions();
-
-        downloadBtn.style.display = 'none';
-
-        inputStatus.setAttribute('data-state', 'detected');
-
-        inputStatus.textContent =
-          `${info.title || platform.label} — siap didownload.`;
-
-        /*
-         * VIDEO
-         * Tampilkan Video + Audio jika tersedia.
-         */
-        if (info.media_type === 'video') {
-          addDownloadButton(
-            '⬇ Download Video',
-            'video',
-            value
-          );
-
-          if (info.has_audio) {
-            addDownloadButton(
-              '♫ Download Audio / MP3',
-              'audio',
-              value
-            );
-          }
-        }
-
-        /*
-         * PHOTO
-         * Tampilkan Photo + Audio jika tersedia.
-         */
-        else if (info.media_type === 'photo') {
-          addDownloadButton(
-            '▧ Download Photo',
-            'photo',
-            value
-          );
-
-          if (info.has_audio) {
-            addDownloadButton(
-              '♫ Download Audio / MP3',
-              'audio',
-              value
-            );
-          }
-        }
-
-        /*
-         * Jika tipe media tidak dikenali.
-         */
-        else {
-          showToast(
-            'Jenis media belum didukung oleh API.'
-          );
-
-          downloadBtn.style.display = '';
-          downloadBtn.disabled = false;
-          downloadBtn.textContent = 'Download';
-        }
-
-      } catch (error) {
-        console.error('NecroDL Error:', error);
-
-        inputStatus.textContent =
-          error.message || 'Terjadi kesalahan saat memproses URL.';
-
-        inputStatus.setAttribute('data-state', 'unknown');
-
-        showToast(
-          error.message || 'Gagal memproses URL.'
-        );
-
-        downloadBtn.style.display = '';
-        downloadBtn.disabled = false;
-        downloadBtn.textContent = 'Coba Lagi';
-      }
-    });
-  }
-
+  initTheme();
 })();
