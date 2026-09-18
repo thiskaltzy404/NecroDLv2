@@ -2,6 +2,8 @@
 (function () {
   'use strict';
 
+  // IMPORTANT: this must match the currently AVAILABLE Back4App deployment URL.
+  // If Back4App generated a new temporary URL after redeployment, replace this value.
   const API_BASE = 'https://necrodlapi-iz9wptub.b4a.run';
   const THEME_KEY = 'necrodl-theme';
   const root = document.documentElement;
@@ -13,6 +15,34 @@
   const inputStatus = document.getElementById('inputStatus');
   const toastEl = document.getElementById('toast');
   const mediaResult = document.getElementById('mediaResult');
+
+  // Keep normal typing/pasting in URL fields working while disabling ordinary
+  // page selection/copy/context-menu/drag interactions for visible site content.
+  function isEditableTarget(target) {
+    return !!target?.closest?.('input, textarea, [contenteditable="true"]');
+  }
+  document.addEventListener('contextmenu', (event) => {
+    if (!isEditableTarget(event.target)) event.preventDefault();
+  }, { capture: true });
+  document.addEventListener('selectstart', (event) => {
+    if (!isEditableTarget(event.target)) event.preventDefault();
+  }, { capture: true });
+  document.addEventListener('dragstart', (event) => {
+    if (event.target?.tagName === 'IMG' || !isEditableTarget(event.target)) event.preventDefault();
+  }, { capture: true });
+  document.addEventListener('copy', (event) => {
+    if (!isEditableTarget(event.target)) event.preventDefault();
+  }, { capture: true });
+  document.addEventListener('cut', (event) => {
+    if (!isEditableTarget(event.target)) event.preventDefault();
+  }, { capture: true });
+  document.addEventListener('keydown', (event) => {
+    if (isEditableTarget(event.target)) return;
+    const key = String(event.key || '').toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && ['a', 'c', 'x', 's', 'u'].includes(key)) {
+      event.preventDefault();
+    }
+  }, { capture: true });
 
   function applyTheme(theme) {
     const light = theme === 'light';
@@ -79,7 +109,7 @@
     toastEl.textContent = message;
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3200);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 4200);
   }
 
   function updateStatus(value) {
@@ -186,6 +216,7 @@
       img.alt = 'Media thumbnail';
       img.loading = 'eager';
       img.referrerPolicy = 'no-referrer';
+      img.draggable = false;
       img.onerror = () => { preview.classList.add('media-preview-empty'); img.remove(); preview.textContent = 'Thumbnail tidak dapat ditampilkan.'; };
       preview.appendChild(img);
       card.appendChild(preview);
@@ -216,6 +247,7 @@
     image.className = 'carousel-image';
     image.loading = 'eager';
     image.referrerPolicy = 'no-referrer';
+    image.draggable = false;
     viewport.appendChild(image);
     wrapper.appendChild(viewport);
 
@@ -234,7 +266,6 @@
     next.setAttribute('aria-label', 'Foto berikutnya');
     next.textContent = '›';
 
-    // Navigation exists only when there is more than one photo.
     if (photos.length > 1) {
       controls.append(prev, counter, next);
       wrapper.appendChild(controls);
@@ -304,14 +335,23 @@
   }
 
   async function getMediaInfo(url) {
-    const response = await fetch(`${API_BASE}/api/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/api/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        mode: 'cors',
+        cache: 'no-store'
+      });
+    } catch (networkError) {
+      console.error('NecroDL backend connection error:', networkError);
+      throw new Error('Server downloader tidak dapat dihubungi. URL backend Back4App mungkin sudah berubah setelah redeploy.');
+    }
+
     let data;
-    try { data = await response.json(); } catch (_) { throw new Error('Respons server tidak valid.'); }
-    if (!response.ok || !data?.ok) throw new Error(data?.detail || data?.error || 'URL tidak dapat diproses.');
+    try { data = await response.json(); } catch (_) { throw new Error(`Server mengembalikan respons yang tidak valid (HTTP ${response.status}).`); }
+    if (!response.ok || !data?.ok) throw new Error(data?.detail || data?.error || `Server gagal memproses link (HTTP ${response.status}).`);
     return data;
   }
 
